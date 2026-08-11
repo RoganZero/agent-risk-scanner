@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv*/
+venv/
+.env
+!.env.example
+!examples/unsafe-agent-project/.env
+dist/
+build/
+report.md
+report.json
+smoke-report.md
+smoke-report.json
+outputs/
+work/
