@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 
 
@@ -27,3 +27,22 @@ class Finding:
         result["severity"] = self.severity.name
         return result
 
+
+@dataclass(frozen=True, slots=True)
+class SkippedFile:
+    file_path: str
+    reason: str
+
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ScanResult:
+    findings: list[Finding]
+    scanned_files: int
+    skipped_files: list[SkippedFile] = field(default_factory=list)
+
+    @property
+    def scan_complete(self) -> bool:
+        return not self.skipped_files

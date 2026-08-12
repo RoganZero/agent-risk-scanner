@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from .reporters import render_json, render_markdown
-from .scanner import scan_path
+from .scanner import scan_project
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        findings = scan_path(
+        scan_result = scan_project(
             args.path,
             exclude_paths={args.output} if args.output is not None else None,
         )
@@ -41,14 +41,17 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.format == "json":
-        report = render_json(args.path, findings)
+        report = render_json(args.path, scan_result)
     else:
-        report = render_markdown(args.path, findings)
+        report = render_markdown(args.path, scan_result)
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(report, encoding="utf-8")
-        print(f"Wrote {args.format} report to {args.output} ({len(findings)} risks).")
+        print(
+            f"Wrote {args.format} report to {args.output} "
+            f"({len(scan_result.findings)} risks)."
+        )
     else:
         print(report, end="")
     return 0

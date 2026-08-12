@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agent_risk_scanner.models import Finding, Severity
+from agent_risk_scanner.models import Finding, ScanResult, Severity, SkippedFile
 from agent_risk_scanner.reporters import render_json, render_markdown
 
 
@@ -47,3 +47,23 @@ def test_json_report_is_valid_and_structured(tmp_path: Path):
     assert payload["findings"][0]["severity"] == "HIGH"
     assert payload["findings"][0]["rule_id"] == "EXEC_OS_SYSTEM"
 
+
+def test_reports_scan_coverage_metadata(tmp_path: Path):
+    result = ScanResult(
+        findings=sample_findings(),
+        scanned_files=3,
+        skipped_files=[SkippedFile("linked-secret.txt", "symbolic link skipped")],
+    )
+
+    markdown = render_markdown(tmp_path, result, scanned_at=SCAN_TIME)
+    payload = json.loads(render_json(tmp_path, result, scanned_at=SCAN_TIME))
+
+    assert "**Scan complete:** False" in markdown
+    assert "**Scanned files:** 3" in markdown
+    assert "`linked-secret.txt`" in markdown
+    assert payload["scan_complete"] is False
+    assert payload["scanned_files"] == 3
+    assert payload["skipped_files"] == 1
+    assert payload["skipped_file_details"] == [
+        {"file_path": "linked-secret.txt", "reason": "symbolic link skipped"}
+    ]
